@@ -56,6 +56,10 @@ pip install -r requirements.txt
 - To try **v2**, please use `demo_v2.py`.  
 - You may need to download the corresponding model weights.  
 - When providing the **title** and **abstract**, please avoid line breaks, LaTeX symbols, or other special formatting.  
+> **Note**  
+> The inference logic of **v1** and **v2** is identical. They are separated only to demonstrate two different loading methods:  
+> - **demo_v1.py** shows how to load the *full model weights*.  
+> - **demo_v2.py** shows how to load the *LoRA adapter* on top of the base model.
 
 ## How to Reproduce
 ### NAIPv1 
@@ -83,7 +87,7 @@ Then, type `sh test.sh`.
 
 
 ### NAIPv2
-Check `NAIP/v2_resource/shell/fine-tune.sh` and modify depend on your situation.
+Check `NAIP/v2_resource/shell/fine-tune.sh` and modify it according to your setup.
 
 
 ## 🛠️ Free Support for Academic Use
@@ -104,13 +108,21 @@ The `jsonl` file template is provided in `./assets/free_inference_template.jsonl
 If you find this work useful, please cite:
 
 ```bibtex
-@article{Zhao2024NAIP,
+@inproceedings{zhao2025NAIPv1,
   title={From Words to Worth: Newborn Article Impact Prediction with LLM},
-  author={Penghai Zhao and Qinghua Xing and Kairan Dou and Jinyu Tian and Ying Tai and Jian Yang and Ming-Ming Cheng and Xiang Li},
-  journal={ArXiv},
-  year={2024},
-  volume={abs/2408.03934},
-  url={https://api.semanticscholar.org/CorpusID:271744831}
+  author={Zhao, Penghai and Xing, Qinghua and Dou, Kairan and Tian, Jinyu and Tai, Ying and Yang, Jian and Cheng, Ming-Ming and Li, Xiang},
+  booktitle={Proceedings of the AAAI Conference on Artificial Intelligence},
+  volume={39},
+  number={1},
+  pages={1183--1191},
+  year={2025}
+}
+
+@article{zhao2025NAIPv2,
+  title={NAIPv2: Debiased Pairwise Learning for Efficient Paper Quality Estimation},
+  author={Zhao, Penghai and Tian, Jinyu and Xing, Qinghua and Zhang, Xin and Li, Zheng and Qian, Jianjun and Cheng, Ming-Ming and Li, Xiang},
+  journal={arXiv preprint arXiv:2509.25179},
+  year={2025}
 }
 ```
 
