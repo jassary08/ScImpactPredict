@@ -1,17 +1,12 @@
 import os
 import csv
-import json
 import time
 import logging
 import argparse
 from datetime import datetime
-from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
-
 import numpy as np
-import pandas as pd
-import torch
 
-from accelerate import Accelerator, DistributedType
+from accelerate import Accelerator
 from accelerate.utils import set_seed, tqdm
 from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training, TaskType
 from scipy.stats import spearmanr
@@ -22,7 +17,6 @@ from torch.utils.tensorboard import SummaryWriter
 from transformers import (
     AutoModelForSequenceClassification,
     AutoTokenizer,
-    BitsAndBytesConfig,
     get_scheduler,
 )
 
@@ -312,41 +306,31 @@ class SiameseWrapper(torch.nn.Module):
 
 def get_model_and_tokenizer(args: argparse.Namespace) -> Tuple[AutoTokenizer, SiameseWrapper]:
     """Build tokenizer + model with optional 8-bit and LoRA."""
-    use_cuda = torch.cuda.is_available()
-    load_in_8bit = bool(args.load_in_8bit) and use_cuda
 
-    quant_config = None
-    if load_in_8bit:
-        quant_config = BitsAndBytesConfig(
-            load_in_8bit=True,
-            llm_int8_threshold=6.0,
-            llm_int8_has_fp16_weight=True,
-        )
+    device_map = {'': torch.cuda.current_device()}
+    print(device_map)
 
-    tokenizer = AutoTokenizer.from_pretrained(args.checkpoint, use_fast=True)
-    base_model = AutoModelForSequenceClassification.from_pretrained(
+    tokenizer = AutoTokenizer.from_pretrained(args.checkpoint)
+
+    model = AutoModelForSequenceClassification.from_pretrained(
         args.checkpoint,
         num_labels=args.num_labels,
-        quantization_config=quant_config,
-        device_map="auto" if use_cuda else None,  # rely on HF accelerate mapping when CUDA
+        device_map={"": torch.cuda.current_device()},
+        load_in_8bit=True
     )
 
-    # Padding/eos setup
-    if getattr(base_model.config, "pad_token_id", None) is None:
-        base_model.config.pad_token_id = base_model.config.eos_token_id
-    if tokenizer.pad_token is None:
-        tokenizer.pad_token = tokenizer.eos_token
+    model.config.pad_token_id = model.config.eos_token_id
+    tokenizer.pad_token = tokenizer.eos_token
+    model.loss_func = args.loss_func
 
-    # LoRA
-    target_modules = [m.strip() for m in args.target_modules.split(",") if m.strip()] if args.target_modules else None
-    if target_modules and target_modules != [""]:
+    if len(args.target_modules) > 0:
         lora_config = LoraConfig(
             r=args.lora_r,
             lora_alpha=args.lora_alpha,
             lora_dropout=args.lora_dropout,
-            target_modules=target_modules,
+            target_modules=args.target_modules.split(','),
             task_type=TaskType.SEQ_CLS,
-            inference_mode=False,
+            inference_mode=False
         )
     else:
         lora_config = LoraConfig(
@@ -354,18 +338,14 @@ def get_model_and_tokenizer(args: argparse.Namespace) -> Tuple[AutoTokenizer, Si
             lora_alpha=args.lora_alpha,
             lora_dropout=args.lora_dropout,
             task_type=TaskType.SEQ_CLS,
-            inference_mode=False,
+            inference_mode=False
         )
 
-    # Prepare for k-bit training if quantized
-    if load_in_8bit:
-        base_model = prepare_model_for_kbit_training(base_model)
-
-    base_model = get_peft_model(base_model, lora_config)
-    base_model.print_trainable_parameters()
-
-    siamese = SiameseWrapper(base_model)
-    return tokenizer, siamese
+    model = prepare_model_for_kbit_training(model)
+    model = get_peft_model(model, lora_config)
+    model.print_trainable_parameters()
+    siamese_model = SiameseWrapper(model)
+    return tokenizer, siamese_model
 
 
 # ---------------------------------------------------------------------
