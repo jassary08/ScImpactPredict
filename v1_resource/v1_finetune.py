@@ -49,7 +49,7 @@ from peft import (
 )
 
 # Project-specific dataset. Expected to return dicts with "input_ids", "attention_mask", "labels"
-from NAIDv1.dataset import TextDataset
+from NAIDv1.dataset import NAID_Dataset
 
 # Make tokenizers deterministic & avoid tokenizer multithreading overhead spam
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
@@ -115,20 +115,7 @@ class FocalMSELoss(nn.Module):
         return loss
 
 
-def build_loss_fn(name: str) -> nn.Module:
-    name = name.lower()
-    if name == "mse":
-        return nn.MSELoss()
-    if name == "l1":
-        return nn.L1Loss()
-    if name == "smoothl1":
-        return nn.SmoothL1Loss()
-    if name == "bce":
-        # For BCE we assume labels in [0,1] and model outputs raw logits -> use BCEWithLogitsLoss
-        return nn.BCEWithLogitsLoss()
-    if name == "focalmse":
-        return FocalMSELoss(gamma=1.0)
-    raise ValueError(f"Unknown loss_func: {name}")
+
 
 
 # ---------------------------
@@ -137,15 +124,29 @@ def build_loss_fn(name: str) -> nn.Module:
 class RegressionTrainer(Trainer):
     """
     Override compute_loss to support custom losses (mse/l1/smoothl1/bce/focalmse).
-    - If num_labels == 1 and loss is mse/l1/smoothl1/focalmse: we assume a regression task and
-      model outputs logits of shape (batch, 1). We'll squeeze to (batch,).
+    - we assume a regression task and model outputs logits of shape (batch, 1). We'll squeeze to (batch,).
     - For bce: we'll also squeeze and apply BCEWithLogits on raw logits.
     """
 
     def __init__(self, *args, loss_func: str = "mse", **kwargs):
         super().__init__(*args, **kwargs)
         self._loss_name = loss_func
-        self._loss_fn = build_loss_fn(loss_func)
+        self._loss_fn = self.build_loss_fn(loss_func)
+
+    def build_loss_fn(self, name: str) -> nn.Module:
+        name = name.lower()
+        if name == "mse":
+            return nn.MSELoss()
+        if name == "l1":
+            return nn.L1Loss()
+        if name == "smoothl1":
+            return nn.SmoothL1Loss()
+        if name == "bce":
+            # For BCE we assume labels in [0,1] and model outputs raw logits -> use BCEWithLogitsLoss
+            return nn.BCEWithLogitsLoss()
+        if name == "focalmse":
+            return FocalMSELoss(gamma=1.0)
+        raise ValueError(f"Unknown loss_func: {name}")
 
     def compute_loss(self, model, inputs, return_outputs=False):
         labels = inputs.get("labels")
@@ -160,6 +161,7 @@ class RegressionTrainer(Trainer):
             # BCEWithLogits expects float targets in {0,1}
             loss = self._loss_fn(logits, labels.float())
         else:
+            logits = torch.sigmoid(logits)
             loss = self._loss_fn(logits, labels)
 
         return (loss, outputs) if return_outputs else loss
@@ -241,7 +243,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--learning_rate", type=float, default=None)
     parser.add_argument("--weight_decay", type=float, default=1e-2)
     parser.add_argument("--warmup_ratio", type=float, default=0.1)
-    parser.add_argument("--max_length", type=int, default=1024)
+    parser.add_argument("--max_length", type=int, default=512)
     parser.add_argument("--seed", type=int, default=42)
 
     # Mixed precision
@@ -249,8 +251,6 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--bf16", action="store_true", help="Use bf16 if supported")
 
     # Task / labels
-    parser.add_argument("--num_labels", type=int, default=1,
-                        help="For regression use 1. For BCE you still set 1 and provide labels in {0,1}.")
     parser.add_argument("--loss_func", type=str, default="mse",
                         choices=["bce", "mse", "l1", "smoothl1", "focalmse"])
 
@@ -261,11 +261,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--lora_alpha", type=int, default=32)
     parser.add_argument("--lora_dropout", type=float, default=0.05)
     parser.add_argument("--target_modules", type=str, default="q_proj,v_proj",
-                        help="Comma-separated module names to apply LoRA. Leave empty to let PEFT infer.")
+                        help="Comma-separated module names to apply LoRA.")
 
     # Dataset-specific
-    parser.add_argument("--prompt_style", type=int, default=0,
-                        help="Passed to NAID.dataset.TextDataset.")
+    parser.add_argument("--gt_row", type=str, default='TNCSI_SP',
+                        help="Passed to NAID_Dataset. Choose between TNCSI_SP || TNCSI")
 
     # Eval/save
     parser.add_argument("--logging_steps", type=int, default=50)
@@ -305,7 +305,7 @@ def main():
 
     # Load data
     df_trainval = pd.read_csv(args.data_path)
-    df_test = pd.read_csv(args.test_data_path)  # DO NOT USE FOR PARAM SEARCHING
+    # df_test = pd.read_csv(args.test_data_path)  # DO NOT USE FOR PARAM SEARCHING
 
     # Tokenizer
     tokenizer = AutoTokenizer.from_pretrained(args.checkpoint, use_fast=True)
@@ -317,13 +317,12 @@ def main():
     # NOTE: DO NOT pass device_map here for DDP (let Trainer/Accelerate handle device placement).
     base_model = AutoModelForSequenceClassification.from_pretrained(
         args.checkpoint,
-        num_labels=args.num_labels,
+        num_labels=1,
         torch_dtype=torch.float16 if args.fp16 else (torch.bfloat16 if args.bf16 else None),
         load_in_8bit=args.load_in_8bit,
     )
-    # Explicitly set problem type for regression if num_labels == 1
-    if args.num_labels == 1 and args.loss_func in {"mse", "l1", "smoothl1", "focalmse"}:
-        base_model.config.problem_type = "regression"
+    # Explicitly set problem type for regression
+    base_model.config.problem_type = "regression"
 
     # Align pad id
     if getattr(base_model.config, "pad_token_id", None) is None and getattr(base_model.config, "eos_token_id", None) is not None:
@@ -340,14 +339,14 @@ def main():
     )
 
     # Datasets
-    total_dataset = TextDataset(df_trainval, tokenizer, args.max_length, args.prompt_style)
+    total_dataset = NAID_Dataset(df_trainval, tokenizer, args.max_length, gt_row = args.gt_row)
     total_size = len(total_dataset)
     train_size = int(0.9 * total_size)
     val_size = total_size - train_size
     train_dataset, val_dataset = random_split(total_dataset, [train_size, val_size])
 
     # (Optional) Test dataset — not used during training to avoid leakage
-    _ = TextDataset(df_test, tokenizer, args.max_length, args.prompt_style)
+    # _ = NAID_Dataset(df_test, tokenizer, args.max_length, gt_row = args.gt_row)
 
     # Collator
     data_collator = DataCollatorWithPadding(tokenizer=tokenizer, pad_to_multiple_of=None)

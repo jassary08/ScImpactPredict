@@ -22,6 +22,7 @@ class NAIPv2:
         self.tokenizer.pad_token = self.tokenizer.eos_token
         self.model.config.pad_token_id = self.tokenizer.pad_token_id
 
+        # ⚠️ DO NOT CHANGE PROMPT
         self.prompt_template = (
             "Given a research paper, Title: {title}\nAbstract: {abstract}\nEvaluate the quality of this paper:"
         )
@@ -31,13 +32,12 @@ class NAIPv2:
         inputs = self.tokenizer(prompt, return_tensors='pt', padding=True, truncation=True,
                                 max_length=self.max_length).to(self.device)
         with torch.no_grad():
-            logits = self.model(**inputs).logits  # You may scale logits (e.g., add 1.3–2.5) depending on your needs
-            score = sigmoid(logits).view(-1).item()
+            logits = self.model(**inputs).logits  # You may scale logits depending on your needs
+            score = logits.view(-1).item()
         return score
 
 
 if __name__ == "__main__":
-
     model_path = r"path_to_the_v2_adapter_dir"
     scorer = NAIPv2(model_path=model_path, device='cuda')
 

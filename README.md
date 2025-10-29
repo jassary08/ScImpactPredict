@@ -1,19 +1,25 @@
 
 
 <p align="center">
-  <img src="/img/naip_hr.png" alt="NAIP Logo" width="30%" style="border: 4px solid #231815; border-radius: 12px; padding: 5px;">
+  <img src="/assets/naip_hr.png" alt="NAIP Logo" width="30%" style="border: 4px solid #231815; border-radius: 12px; padding: 5px;">
 </p>
 
-# Framework for newborn article impact & quality estimation.
-
-
-## Overview [![Hugging Face Spaces](https://img.shields.io/badge/%20Try%20Free%20Demo-orange?logo=huggingface)](https://huggingface.co/spaces/ssocean/Newborn_Article_Impact_Predict)
+# Framework for Newborn Article Impact Prediction & Quality Estimation.
 
 <p align="center">
-  <img src="/img/typo.png" alt="NAIP Framework Overview" width="100%">
+&nbsp;&nbsp;📊 <a href="https://huggingface.co/ssocean/NAIP">NAIP-v1-weights</a>&nbsp;&nbsp | &nbsp;&nbsp;📈 <a href="https://huggingface.co/ssocean/NAIPv2">NAIP-v2-weights</a>&nbsp;&nbsp | &nbsp;&nbsp;🤗 <a href="https://huggingface.co/spaces/ssocean/Newborn_Article_Impact_Predict">Hugging Face Demo</a>&nbsp;&nbsp 
+<br>
+&nbsp;&nbsp; 📑 <a href="https://sway.cloud.microsoft/KOH09sPR21Ubojbc">v1 Homepage</a> &nbsp;&nbsp; | &nbsp;&nbsp;📑 <a href="https://sway.cloud.microsoft/Pr42npP80MfPhvj8">v2 Homepage</a>
 </p>
-The NAIP series uses fine-tuned LLMs to quickly predict the **impact** or **quality** of articles based on their internal content. 
 
+
+## Overview 
+
+The NAIP series leverages large language models (LLMs) to efficiently assess the potential impact and quality of research articles through analysis of their intrinsic content. NAIP-v1 focuses on regressing a field- and time-normalized score (TNCSIsp) as a quantitative indicator of scientific impact, while NAIP-v2 aims to model human preferences in the peer-review process by learning from pairwise review data.
+
+<p align="center">
+  <img src="/assets/typo.png" alt="NAIP Framework Overview" width="100%">
+</p>
 
 
 | Version | Input              | Output                  | Model Weights                                                               | Homepage                                                                 | Paper                                                                     |
@@ -51,17 +57,14 @@ pip install -r requirements.txt
 - You may need to download the corresponding model weights.  
 - When providing the **title** and **abstract**, please avoid line breaks, LaTeX symbols, or other special formatting.  
 
-## Reproducing NAIPv1 (optional) 
-##### The following instructions are outdated. We are undergoing a major code refactoring. An updated version will be released after 2025.10.7.
-### Fine-tuning
-For fine-tuning, you may manually modify the 'xxxForSequenceClassification' in the `transformers` package (see llama_for_naip/NAIP_LLaMA.py for more details). Or follow the [instruction](https://huggingface.co/docs/transformers/v4.27.1/en/custom_models#using-a-model-with-custom-code) to use custom code.
-
-Then, prepare `train.sh` bash file like below:
+## How to Reproduce
+### NAIPv1 
+Prepare `train.sh` bash file like below to fine-tune NAIPv1:
 ```
-DATA_PATH="ScImpactPredict/NAID/NAID_train_extrainfo.csv"
-TEST_DATA_PATH="ScImpactPredict/NAID/NAID_test_extrainfo.csv"
+DATA_PATH="NAIP/v1_resource/NAIDv1/NAID_train_extrainfo.csv"
+TEST_DATA_PATH="NAIP/v1_resource/NAIDv1/NAID_test_extrainfo.csv"
 
-OMP_NUM_THREADS=1 accelerate launch offcial_train.py \
+OMP_NUM_THREADS=1 accelerate launch NAIP/v1_resource/v1_finetune.py \
     --total_epochs 5 \
     --learning_rate 1e-4 \
     --data_path $DATA_PATH \
@@ -69,30 +72,32 @@ OMP_NUM_THREADS=1 accelerate launch offcial_train.py \
     --runs_dir official_runs/LLAMA3 \
     --checkpoint  path_to_huggingface_LLaMA3
 ```
-Finally, type `sh train.sh` in the console. Wating for the training ends~
 
-### Testing
 Similar to fine-tuning, prepare `test.sh` as below:
 ```
-python official_test.py \
+python NAIP/v1_resource/v1_test.py \
  --data_path NAIP/NAID/NAID_test_extrainfo.csv \
  --weight_dir path_to_runs_dir
 ```
 Then, type `sh test.sh`.
 
 
-## Reproducing NAIPv2 (optional)
-##### Preliminary code and dataset are released at ./v2_resource, detailed instructions will be released after 2025.10.7. 🚀 (Core team members are on vacation 🏖️)
+### NAIPv2
+Check `NAIP/v2_resource/shell/fine-tune.sh` and modify depend on your situation.
 
 
-## 🛠️ Technical Support
-If you would like to conduct **comparison experiments** with NAIP but encounter difficulties in setting up the environment or reproducing the code, we provide **free technical support**.
+## 🛠️ Free Support for Academic Use
 
-Simply send us a `.csv` file containing the **"title"** and **"abstract"** fields, and we will return the prediction results to you.  
-- In urgent cases, results can be provided **within one day**.  
-- This service is free of charge and intended to facilitate **fair, reproducible comparisons** in research.  
+To ensure that research comparisons with **NAIP** are carried out under consistent and reproducible conditions, we provide **free technical assistance** for researchers who may encounter challenges in environment setup or code reproduction.  
 
-📩 Please contact us via [oceanytech@gmail.com].
+You may send a `.jsonl` file containing the **"title"** and **"abstract"** fields, and we will return the corresponding prediction results.  
+
+The `jsonl` file template is provided in `./assets/free_inference_template.jsonl`
+
+- In urgent cases, results can usually be provided **within one day**.  
+- This support is intended solely to facilitate rigorous and reproducible evaluation within the research community and is not available for commercial use or requests.
+
+- 📩 Contact: [oceanytech@gmail.com] 
 
 
 ## 📚 Citation
@@ -109,34 +114,3 @@ If you find this work useful, please cite:
 }
 ```
 
-
-
-[//]: # ()
-[//]: # (## Model Weights)
-
-[//]: # ()
-[//]: # (We also offer the weights of other models for download.)
-
-[//]: # ()
-[//]: # (| LLMs    | Size | MAE   | NDCG  | Mem    | Download Link                                                                                  |)
-
-[//]: # (| ------- | ---- | ----- | ----- | ------ | ---------------------------------------------------------------------------------------------- |)
-
-[//]: # (| Phi-3   | 3.8B | 0.226 | 0.742 | 6.2GB  | [Download]&#40;https://drive.google.com/file/d/1OtZx8L6nyvLav4KYacvfGdG40pCPhn9a/view?usp=sharing&#41; |)
-
-[//]: # (| Falcon  | 7B   | 0.231 | 0.740 | 8.9GB  | [Download]&#40;https://drive.google.com/file/d/18JGDvHLXDpsQyawIEVvJ_08HhBs-boMt/view?usp=sharing&#41; |)
-
-[//]: # (| Qwen-2  | 7B   | 0.223 | 0.774 | 12.6GB | [Download]&#40;https://drive.google.com/file/d/1kq9xckxGqjJAnhtLla--vs_0yozJcvI4/view?usp=sharing&#41; |)
-
-[//]: # (| Mistral | 7B   | 0.220 | 0.850 | 15.4GB | [Download]&#40;https://drive.google.com/file/d/1Rgx-_yLfXt7jTVEmdql6xSZk8vhzmBCV/view?usp=sharing&#41; |)
-
-[//]: # (| Llama-3 | 8B   | 0.216 | 0.901 | 9.4GB  | [Download]&#40;https://drive.google.com/file/d/13-ugXsm35AuzOBUlL6jPacY_z8qVIb7x/view?usp=sharing&#41; |)
-[//]: # ()
-[//]: # (## Compare with Previous Methods )
-
-[//]: # (With a few adjustments based on your specific needs, it should work fine. Since these models train very quickly &#40;less than a few minutes on a single RTX 3080&#41;, we won’t be providing the trained weights.)
-
-[//]: # ()
-[//]: # (##### Repo Structure Description)
-
-[//]: # (Folders like retriever, database, and tools are used for building the NAID and TKPD datasets. They have no direct connection to training or inference.)

@@ -3,7 +3,7 @@ import torch.nn as nn
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
 
 
-class PaperScorer:
+class NAIPv1:
     def __init__(self, model_path: str, device: str = "cuda", max_length: int = 512):
         self.device = torch.device(device if torch.cuda.is_available() else "cpu")
         self.max_length = max_length
@@ -49,7 +49,7 @@ class PaperScorer:
 
 if __name__ == "__main__":
     model_path = r"path_to_the_v1_dir"
-    scorer = PaperScorer(model_path=model_path, device="cuda")
+    scorer = NAIPv1(model_path=model_path, device="cuda")
 
     print("🎯 Enter paper title and abstract. Press Ctrl+C to quit.\n")
 

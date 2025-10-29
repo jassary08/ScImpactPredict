@@ -30,6 +30,11 @@ from v2_resource.NAIDv2.dataset import *
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+
+torch.backends.cudnn.benchmark = False
+torch.backends.cudnn.deterministic = True
+
+
 class PairwiseBCELoss(nn.Module):
     '''
     Aka RankNetLoss
@@ -212,7 +217,7 @@ def get_args() -> argparse.Namespace:
         type=str,
         default='[0,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,"inf"]',
         help='JSON or comma list; use "inf" for +infinity',
-    )
+    ) # DO NOT CHANGE
     parser.add_argument(
         "--pw_target_ratio",
         type=str,
@@ -221,7 +226,7 @@ def get_args() -> argparse.Namespace:
     )
     parser.add_argument("--pw_curriculum", type=_str2bool, default=True)
     parser.add_argument("--pw_balance", type=_str2bool, default=True)
-    parser.add_argument("--pw_cap_per_paper", type=int, default=32, help="-1 means no cap")
+    parser.add_argument("--pw_cap_per_paper", type=int, default=32, help="capacity per paper, -1 means no capacity")
     parser.add_argument("--pw_id_fields", type=str, default="id")
     parser.add_argument("--pw_use_weight", type=_str2bool, default=True)
     parser.add_argument(
@@ -413,8 +418,7 @@ def main() -> None:
 
     # Reproducibility
     set_seed(args.seed)
-    torch.backends.cudnn.benchmark = False
-    torch.backends.cudnn.deterministic = True
+
 
     accelerator = Accelerator()
     device = accelerator.device
@@ -457,25 +461,25 @@ def main() -> None:
         tokenizer=tokenizer,
         max_length=args.max_length,
         prompt_template=args.prompt_template,
-        gt_field=args.gt_field,
-        max_pairs=args.max_pairs,
-        seed=args.seed,
-        group_by_cluster_year=args.pw_group_by_cluster_year,
-        group_keys=group_keys,
-        min_diff=args.pw_min_diff,
-        bucket_edges=bucket_edges,
-        target_ratio=target_ratio,
-        curriculum=args.pw_curriculum,
-        balance=args.pw_balance,
-        cap_per_paper=None if args.pw_cap_per_paper is not None and args.pw_cap_per_paper < 0 else args.pw_cap_per_paper,
-        id_fields_priority=id_fields,
-        use_weight=args.pw_use_weight,
-        weight_mode=args.pw_weight_mode,
-        weight_clip_min=args.pw_weight_clip_min,
-        weight_clip_max=args.pw_weight_clip_max,
-        additional_info=additional_info,
-        verbose=args.pw_verbose,
-        max_samples=args.max_samples,
+        gt_field=args.gt_field,# Ground-truth score field (e.g., score_mean, score_weighted, score_median, score_mode, or RTS)
+        max_samples=args.max_samples,  # Maximum number of samples to load from the dataset before pairing
+        max_pairs=args.max_pairs,  # Maximum number of pairwise samples to generate from all available items
+        seed=args.seed,  # Random seed for reproducibility
+        group_by_cluster_year=args.pw_group_by_cluster_year,# Whether to group data by cluster/year before forming pairs
+        group_keys=group_keys,  # Columns used for grouping if group_by_cluster_year is enabled
+        min_diff=args.pw_min_diff,  # Minimum absolute score difference required to form a valid pair
+        bucket_edges=bucket_edges,  # DO NOT CHANGE
+        target_ratio=target_ratio,  # Desired sampling ratio for each diff bucket
+        curriculum=args.pw_curriculum,  # Enable curriculum learning (sort pairs by difficulty)
+        balance=args.pw_balance,  # Randomly swap the two samples in a pair to prevent positional bias (recommended)
+        cap_per_paper=None if args.pw_cap_per_paper is not None and args.pw_cap_per_paper < 0 else args.pw_cap_per_paper, # Maximum number of pairs each paper can appear in
+        use_weight=args.pw_use_weight,  # Deprecated
+        weight_mode=args.pw_weight_mode,  # Deprecated
+        weight_clip_min=args.pw_weight_clip_min,  # Deprecated
+        weight_clip_max=args.pw_weight_clip_max,  # Deprecated
+        additional_info=additional_info,  # Optional additional fields to include in the text input
+        verbose=args.pw_verbose,  # Whether to print detailed dataset construction statistics
+
     )
 
     val_ds = SingleScoreDataset(
@@ -501,11 +505,6 @@ def main() -> None:
         curriculum=False,
         balance=True,
         cap_per_paper=1024,
-        id_fields_priority=id_fields,
-        use_weight=False,
-        weight_mode=args.pw_weight_mode,
-        weight_clip_min=args.pw_weight_clip_min,
-        weight_clip_max=args.pw_weight_clip_max,
         additional_info=additional_info,
         verbose=False,
     )

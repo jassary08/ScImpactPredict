@@ -33,8 +33,10 @@ from sklearn.metrics import ndcg_score
 from transformers import AutoTokenizer
 from peft import AutoPeftModelForSequenceClassification
 
+from v1_resource.NAIDv1.dataset import NAID_Dataset
+
 # Project-specific dataset loader (must return dict with input_ids, attention_mask, labels)
-from offcial_train import TextDataset
+
 
 # ------------------------
 # Reproducibility
@@ -111,8 +113,8 @@ def get_args():
     parser.add_argument("--lora_bias", type=str, default="none")
     parser.add_argument("--target_modules", type=str, default="q_proj,v_proj")
 
-    # Prompt style (dataset-specific)
-    parser.add_argument("--prompt_style", type=int, default=0)
+    # Dataset-specific
+    parser.add_argument("--gt_row", type=str, default='TNCSI_SP')
 
     # Logging
     default_tb_dir = datetime.now().strftime("%m-%d-%H-%M")
@@ -159,9 +161,9 @@ def main():
 
     # Load dataset
     full_data = pd.read_csv(args.data_path)
-    dataset = TextDataset(full_data, tokenizer,
+    dataset = NAID_Dataset(full_data, tokenizer,
                           max_length=args.max_length,
-                          prompt_style=args.prompt_style)
+                          gt_row=args.gt_row)
 
     test_loader = DataLoader(dataset, batch_size=args.batch_size, shuffle=False)
     print(f"Test DataLoader has {len(test_loader)} batches.")
