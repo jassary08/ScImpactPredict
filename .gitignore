@@ -29,3 +29,5 @@ local_test/test.py
 /local_test
 predict_accept.py
 save_models.py
+predict_accept.py
+NAIP.7z
