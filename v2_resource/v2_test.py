@@ -47,7 +47,10 @@ from transformers import (
     AutoModelForSequenceClassification,
     BitsAndBytesConfig,
 )
-
+import sys
+import os
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.append(BASE_DIR)
 from v2_resource.NAIDv2.dataset import SingleScoreDataset
 
 
